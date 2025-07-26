@@ -4,41 +4,44 @@ from typing import Literal
 
 
 @tool
-def consult_cardiologist(symptoms: str) -> str:
-    """Consult cardiologist for heart and cardiovascular related symptoms."""
-    return f"HANDOFF_TO_CARDIOLOGIST: {symptoms}"
+def consult_cardiologist(summary: str) -> str:
+    """Send the compiled clinical summary to the cardiologist."""
+    return f"HANDOFF_TO_CARDIOLOGIST: {summary}"
 
 
 @tool
-def consult_neurologist(symptoms: str) -> str:
-    """Consult neurologist for brain, nerve, and neurological symptoms."""
-    return f"HANDOFF_TO_NEUROLOGIST: {symptoms}"
+def consult_neurologist(summary: str) -> str:
+    """Send the compiled clinical summary to the neurologist."""
+    return f"HANDOFF_TO_NEUROLOGIST: {summary}"
 
 
 @tool
-def consult_dermatologist(symptoms: str) -> str:
-    """Consult dermatologist for skin, hair, and nail related symptoms."""
-    return f"HANDOFF_TO_DERMATOLOGIST: {symptoms}"
+def consult_dermatologist(summary: str) -> str:
+    """Send the compiled clinical summary to the dermatologist."""
+    return f"HANDOFF_TO_DERMATOLOGIST: {summary}"
 
 
 @tool
-def consult_orthopedist(symptoms: str) -> str:
-    """Consult orthopedist for bone, joint, and musculoskeletal symptoms."""
-    return f"HANDOFF_TO_ORTHOPEDIST: {symptoms}"
+def consult_orthopedist(summary: str) -> str:
+    """Send the compiled clinical summary to the orthopedist."""
+    return f"HANDOFF_TO_ORTHOPEDIST: {summary}"
 
 
 @tool
-def consult_endocrinologist(symptoms: str) -> str:
-    """Consult endocrinologist for hormone, diabetes, and endocrine symptoms."""
-    return f"HANDOFF_TO_ENDOCRINOLOGIST: {symptoms}"
+def consult_endocrinologist(summary: str) -> str:
+    """Send the compiled clinical summary to the endocrinologist."""
+    return f"HANDOFF_TO_ENDOCRINOLOGIST: {summary}"
 
 
 class MainDoctor:
+    """Primary care physician that conducts interactive history taking before specialist referral."""
+
     def __init__(self, llm, logger):
         self.llm = llm
         self.logger = logger
         self.name = "Dr. Sarah Chen"
         self.specialty = "Primary Care Physician & Medical Supervisor"
+        self.MAX_QUESTIONS = 5  # Maximum follow-up questions to ask
 
         self.tools = [
             consult_cardiologist,
@@ -48,88 +51,126 @@ class MainDoctor:
             consult_endocrinologist,
         ]
 
-        self.system_prompt = f"""You are {self.name}, a highly experienced Primary Care Physician and Medical Supervisor.
+        self.system_prompt = f"""You are {self.name}, an experienced Primary Care Physician conducting a medical consultation.
 
 Your role is to:
-1. Listen to patient symptoms carefully
-2. Perform initial assessment and triage
-3. Determine which specialists to consult based on symptoms
-4. Coordinate with specialist doctors to get expert opinions
-5. Synthesize all information into final recommendations
+1. Take a focused but thorough medical history through targeted questions
+2. Ask relevant follow-up questions based on patient responses (maximum {self.MAX_QUESTIONS} questions)
+3. Once you have sufficient information, create a structured clinical summary
+4. Select the most appropriate specialist and refer the patient
+5. Inform the patient about the referral politely
+
+IMPORTANT GUIDELINES:
+- Ask one clear, specific question at a time
+- Focus on key diagnostic criteria: onset, duration, severity, location, aggravating/relieving factors
+- Consider red flags and emergency symptoms
+- After gathering enough information, create a CLINICAL SUMMARY and call the appropriate specialist tool
+- Always emphasize this is educational only and recommend real medical consultation
 
 Available specialists:
-- Cardiologist: Heart and cardiovascular issues
-- Neurologist: Brain, nerves, and neurological disorders  
-- Dermatologist: Skin, hair, and nail conditions
-- Orthopedist: Bones, joints, and musculoskeletal problems
-- Endocrinologist: Hormones, diabetes, and endocrine disorders
+- Cardiologist: Heart and cardiovascular issues (chest pain, palpitations, shortness of breath)
+- Neurologist: Brain, nerves, headaches, seizures, weakness, numbness
+- Dermatologist: Skin, hair, nail conditions, rashes, lesions
+- Orthopedist: Bones, joints, muscles, fractures, sprains, back pain
+- Endocrinologist: Diabetes, thyroid, hormones, weight issues, fatigue
 
-Important guidelines:
-- Always emphasize this is for educational purposes only
-- Recommend seeing real healthcare professionals
-- For emergency symptoms, advise immediate medical attention
-- Be professional, empathetic, and thorough
-- Use appropriate medical terminology but explain it clearly
+When you have enough information, say:
+"Thank you for providing those details. Based on your symptoms, I believe you should see our [SPECIALIST NAME]. Let me connect you with them now."
 
-When you need specialist input, use the consultation tools available to you.
-"""
+Then call the appropriate consultation tool with a structured clinical summary.
 
-    def process_patient_input(self, patient_input: str, state: dict):
-        # Log patient input
-        self.logger.log_message("Patient", patient_input, "input")
+OUTPUT FORMAT:
+- Either ask ONE follow-up question
+- OR provide the referral statement and call the specialist tool
 
-        # Create the prompt with patient input
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": f"Patient presents with: {patient_input}"},
-        ]
+Remember: This is for educational purposes only. Always advise seeking real medical care."""
 
-        # Get LLM response
+    def ask_or_triage(self, patient_message: str, memory: list, state: dict):
+        """
+        Interactive consultation method that either asks follow-up questions or triages to specialist.
+
+        Args:
+            patient_message: Current patient input
+            memory: Conversation history list
+            state: Shared state dictionary
+
+        Returns:
+            dict with follow_up question or triage decision
+        """
+        # Add patient message to conversation memory
+        memory.append({"role": "user", "content": patient_message})
+
+        # Prepare messages for LLM
+        messages = [{"role": "system", "content": self.system_prompt}] + memory
+
+        # Get LLM response with tools
         llm_with_tools = self.llm.bind_tools(self.tools)
         response = llm_with_tools.invoke(messages)
 
-        # Log main doctor's initial response
+        # Log the doctor's response
         self.logger.log_message(self.name, response.content)
 
-        # Check if tools were called
+        # Track question count
+        if "?" in response.content:
+            state["question_count"] = state.get("question_count", 0) + 1
+
+        # Prepare result
+        result = {"agent_msg": response.content, "follow_up": None, "triaged": False}
+
+        # Check if tools were called (specialist referral)
         if response.tool_calls:
-            for tool_call in response.tool_calls:
-                tool_name = tool_call["name"]
-                tool_args = tool_call["args"]
+            tool_call = response.tool_calls[0]
+            tool_name = tool_call["name"]
+            clinical_summary = tool_call["args"]["summary"]
 
-                # Execute the handoff
-                if "cardiologist" in tool_name:
-                    state["next_agent"] = "cardiologist"
-                elif "neurologist" in tool_name:
-                    state["next_agent"] = "neurologist"
-                elif "dermatologist" in tool_name:
-                    state["next_agent"] = "dermatologist"
-                elif "orthopedist" in tool_name:
-                    state["next_agent"] = "orthopedist"
-                elif "endocrinologist" in tool_name:
-                    state["next_agent"] = "endocrinologist"
+            # Store clinical summary
+            state["clinical_summary"] = clinical_summary
 
-                state["consultation_request"] = tool_args["symptoms"]
+            # Determine next agent
+            if "cardiologist" in tool_name:
+                state["next_agent"] = "cardiologist"
+            elif "neurologist" in tool_name:
+                state["next_agent"] = "neurologist"
+            elif "dermatologist" in tool_name:
+                state["next_agent"] = "dermatologist"
+            elif "orthopedist" in tool_name:
+                state["next_agent"] = "orthopedist"
+            elif "endocrinologist" in tool_name:
+                state["next_agent"] = "endocrinologist"
+
+            result["triaged"] = True
         else:
-            state["next_agent"] = "end"
+            # It's a follow-up question
+            result["follow_up"] = response.content
 
-        state["main_doctor_assessment"] = response.content
-        return state
+            # Safety check for maximum questions
+            if state.get("question_count", 0) >= self.MAX_QUESTIONS:
+                self.logger.log_message(
+                    self.name,
+                    "I have enough information now. Let me determine the best specialist for you.",
+                )
+                # Force triage on next iteration
+                result["follow_up"] = (
+                    "Thank you for all the information. Let me now determine the best course of action for you."
+                )
+
+        return result
 
     def provide_final_summary(self, state: dict):
+        """Provide final consultation summary (kept for compatibility)"""
         specialist_input = state.get("specialist_response", "")
-        initial_assessment = state.get("main_doctor_assessment", "")
+        clinical_summary = state.get("clinical_summary", "")
 
-        summary_prompt = f"""Based on the initial assessment and specialist consultation, provide a comprehensive final summary and recommendations.
+        summary_prompt = f"""Provide a brief final summary of this consultation.
 
-Initial Assessment: {initial_assessment}
-Specialist Input: {specialist_input}
+Clinical Summary: {clinical_summary}
+Specialist Assessment: {specialist_input}
 
 Please provide:
-1. Summary of findings
-2. Possible conditions to consider
-3. Recommended next steps
-4. Important disclaimers about seeking professional medical care
+1. Key findings summary
+2. Specialist recommendations received
+3. Important next steps
+4. Reminder about seeking professional medical care
 """
 
         messages = [
@@ -138,6 +179,7 @@ Please provide:
         ]
 
         response = self.llm.invoke(messages)
-        self.logger.log_message(self.name, f"FINAL SUMMARY:\n{response.content}")
+        final_summary = f"CONSULTATION SUMMARY:\n{response.content}"
+        self.logger.log_message(self.name, final_summary)
 
-        return response.content
+        return final_summary
