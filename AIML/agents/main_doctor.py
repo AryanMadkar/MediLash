@@ -147,11 +147,11 @@ Remember: This is for educational purposes only. Always advise seeking real medi
             if state.get("question_count", 0) >= self.MAX_QUESTIONS:
                 self.logger.log_message(
                     self.name,
-                    "I have enough information now. Let me determine the best specialist for you.",
+                    "I have enough information now. Let me determine the best specialist for you. would you like to connect with our specialist.",
                 )
                 # Force triage on next iteration
                 result["follow_up"] = (
-                    "Thank you for all the information. Let me now determine the best course of action for you."
+                    "Thank you for all the information. Let me now determine the best course of action for you, would you like to connect with our specialist."
                 )
 
         return result

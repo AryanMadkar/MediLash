@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 
-# Enable CORS for MERN stack communication
-CORS(app, origins=['http://localhost:3000', 'https://your-frontend-domain.com'])
+# Enable CORS for production
+CORS(app, origins=['*'], methods=['GET', 'POST', 'OPTIONS'], allow_headers=['Content-Type', 'Authorization'])
 
 # Initialize components
 session_manager = SessionManager()
@@ -30,25 +30,33 @@ def health_check():
         "version": "1.0.0"
     })
 
+@app.route('/api/health', methods=['GET'])
+def api_health_check():
+    """API Health check endpoint"""
+    return jsonify({
+        "status": "healthy",
+        "message": "Medical AI Bot API is running",
+        "timestamp": datetime.now().isoformat()
+    })
+
 @app.route('/api/start-consultation', methods=['POST'])
 def start_consultation():
     """Start a new medical consultation session"""
     try:
         data = request.get_json()
-        
         if not data or 'message' not in data:
             return jsonify({
                 "error": "Message is required to start consultation",
                 "success": False
             }), 400
-        
+
         patient_message = data['message'].strip()
         if not patient_message:
             return jsonify({
                 "error": "Message cannot be empty",
                 "success": False
             }), 400
-        
+
         # Create new session
         session_id = str(uuid.uuid4())
         bot = ServerMedicalBot()
@@ -84,13 +92,12 @@ def send_message():
     """Send message in ongoing consultation"""
     try:
         data = request.get_json()
-        
         if not data or 'session_id' not in data or 'message' not in data:
             return jsonify({
                 "error": "Session ID and message are required",
                 "success": False
             }), 400
-        
+
         session_id = data['session_id']
         patient_message = data['message'].strip()
         
@@ -99,7 +106,7 @@ def send_message():
                 "error": "Message cannot be empty",
                 "success": False
             }), 400
-        
+
         # Get session
         session_data = session_manager.get_session(session_id)
         if not session_data:
@@ -107,7 +114,7 @@ def send_message():
                 "error": "Invalid or expired session",
                 "success": False
             }), 404
-        
+
         bot = session_data['bot']
         
         # Continue consultation
@@ -142,7 +149,8 @@ def send_message():
                 "clinical_summary": result.get("clinical_summary", ""),
                 "specialist_assessment": result["doctor_response"],
                 "recommendations": result.get("recommendations", []),
-                "medications": result.get("medications", [])
+                "medications": result.get("medications", []),
+                "is_specialist": True
             })
         elif result["stage"] == "consultation_complete":
             response_data.update({
@@ -152,7 +160,6 @@ def send_message():
             })
         
         logger.info(f"Message processed for session: {session_id}, stage: {result['stage']}")
-        
         return jsonify(response_data)
         
     except Exception as e:
@@ -167,13 +174,12 @@ def end_consultation():
     """End consultation and cleanup session"""
     try:
         data = request.get_json()
-        
         if not data or 'session_id' not in data:
             return jsonify({
                 "error": "Session ID is required",
                 "success": False
             }), 400
-        
+
         session_id = data['session_id']
         
         # Get final summary
@@ -208,7 +214,6 @@ def get_session_status(session_id):
     """Get current session status"""
     try:
         session_data = session_manager.get_session(session_id)
-        
         if not session_data:
             return jsonify({
                 "error": "Session not found",
@@ -231,6 +236,65 @@ def get_session_status(session_id):
             "success": False
         }), 500
 
+@app.route('/api/connect-specialist', methods=['POST'])
+def connect_specialist():
+    """Connect to specialist"""
+    try:
+        data = request.get_json()
+        if not data or 'session_id' not in data:
+            return jsonify({
+                "error": "Session ID is required",
+                "success": False
+            }), 400
+        
+        return jsonify({
+            "success": True,
+            "message": "Specialist connection initiated",
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error connecting specialist: {str(e)}")
+        return jsonify({
+            "error": f"Failed to connect specialist: {str(e)}",
+            "success": False
+        }), 500
+
+@app.route('/api/specialists', methods=['GET'])
+def get_specialists():
+    """Get available specialists"""
+    specialists = [
+        {
+            "id": "neurologist",
+            "name": "Dr. David Kim",
+            "specialty": "Neurologist",
+            "experience": "15+ years",
+            "rating": 4.9,
+            "avatar": "🧠"
+        },
+        {
+            "id": "cardiologist", 
+            "name": "Dr. Michael Rodriguez",
+            "specialty": "Cardiologist",
+            "experience": "12+ years",
+            "rating": 4.8,
+            "avatar": "❤️"
+        },
+        {
+            "id": "general",
+            "name": "Dr. Sarah Chen", 
+            "specialty": "General Medicine",
+            "experience": "10+ years",
+            "rating": 4.7,
+            "avatar": "🩺"
+        }
+    ]
+    
+    return jsonify({
+        "success": True,
+        "specialists": specialists
+    })
+
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({
@@ -248,6 +312,5 @@ def internal_error(error):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug = os.environ.get('FLASK_ENV') == 'development'
-    
     logger.info(f"Starting Medical AI Bot Server on port {port}")
     app.run(host='0.0.0.0', port=port, debug=debug)
