@@ -1,126 +1,148 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const messageSchema = new mongoose.Schema({
-  role: {
-    type: String,
-    enum: ['user', 'assistant', 'doctor', 'specialist'],
-    required: true
-  },
-  content: {
-    type: String,
-    required: true
-  },
-  timestamp: {
-    type: Date,
-    default: Date.now
-  },
-  agentName: String,
-  agentSpecialty: String
-});
-
-const medicalConversationSchema = new mongoose.Schema({
-  conversationId: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  title: {
-    type: String,
-    default: 'Medical Consultation'
-  },
-  messages: [messageSchema],
-  summary: {
-    clinicalSummary: String,
-    specialistConsulted: String,
-    recommendations: [String],
-    medications: [String],
-    finalDiagnosis: String
-  },
-  status: {
-    type: String,
-    enum: ['active', 'completed', 'archived'],
-    default: 'completed'
-  },
-  startedAt: {
-    type: Date,
-    default: Date.now
-  },
-  completedAt: Date,
-  tags: [String]
-}, {
-  timestamps: true
-});
-
 const userSchema = new mongoose.Schema({
-  username: {
-    type: String,
-    required: [true, 'Username is required'],
-    unique: true,
-    trim: true,
-    minlength: [3, 'Username must be at least 3 characters long'],
-    maxlength: [30, 'Username cannot exceed 30 characters']
-  },
-  email: {
-    type: String,
-    required: [true, 'Email is required'],
-    unique: true,
-    lowercase: true,
-    trim: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
-  },
-  password: {
-    type: String,
-    required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters long']
-  },
-  profile: {
-    firstName: String,
-    lastName: String,
-    phone: String,
-    dateOfBirth: Date,
-    gender: {
-      type: String,
-      enum: ['male', 'female', 'other']
+    username: {
+        type: String,
+        required: [true, 'Username is required'],
+        unique: true,
+        trim: true,
+        minlength: [3, 'Username must be at least 3 characters'],
+        maxlength: [30, 'Username cannot exceed 30 characters']
     },
-    medicalHistory: [String],
-    allergies: [String],
-    currentMedications: [String]
-  },
-  medicalConversation: [medicalConversationSchema],
-  role: {
-    type: String,
-    enum: ['user', 'admin'],
-    default: 'user'
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  lastLogin: Date,
-  refreshTokens: [String]
-}, {
-  timestamps: true
+    email: {
+        type: String,
+        required: [true, 'Email is required'],
+        unique: true,
+        trim: true,
+        lowercase: true,
+        match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please provide a valid email']
+    },
+    password: {
+        type: String,
+        required: [true, 'Password is required'],
+        minlength: [6, 'Password must be at least 6 characters'],
+        select: false  // Keep this as false for security
+    },
+    profile: {
+        firstName: { type: String, trim: true },
+        lastName: { type: String, trim: true },
+        phone: { type: String, trim: true },
+        dateOfBirth: { type: Date },
+        gender: { 
+            type: String, 
+            enum: ['male', 'female', 'other', 'prefer_not_to_say'],
+            default: 'prefer_not_to_say'
+        },
+        medicalHistory: [{ type: String }],
+        allergies: [{ type: String }],
+        currentMedications: [{ type: String }],
+        emergencyContact: {
+            name: { type: String, trim: true },
+            phone: { type: String, trim: true },
+            relationship: { type: String, trim: true }
+        }
+    },
+    medicalConversation: [{
+        conversationId: { type: String },
+        title: { type: String, default: 'Medical Consultation' },
+        messages: [{
+            role: { 
+                type: String, 
+                enum: ['user', 'doctor', 'specialist'],
+                required: true
+            },
+            content: { type: String, required: true },
+            timestamp: { type: Date, default: Date.now },
+            agentName: { type: String },
+            agentSpecialty: { type: String }
+        }],
+        summary: {
+            clinicalSummary: { type: String },
+            specialistConsulted: { type: String },
+            recommendations: [{ type: String }],
+            medications: [{ type: String }],
+            finalDiagnosis: { type: String }
+        },
+        status: { 
+            type: String, 
+            enum: ['active', 'completed', 'archived'],
+            default: 'active'
+        },
+        startedAt: { type: Date, default: Date.now },
+        completedAt: { type: Date },
+        tags: [{ type: String }]
+    }],
+    token: { type: String },
+    refreshToken: { type: String },
+    isActive: { type: Boolean, default: true },
+    lastLogin: { type: Date },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
 });
 
-// Hash password before saving
+// Create sparse index (to avoid the duplicate key error you had)
+userSchema.index(
+    { 'medicalConversation.conversationId': 1 }, 
+    { sparse: true }
+);
+
+// Hash password before saving - IMPROVED VERSION
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
-  next();
+    // Only hash if password is modified
+    if (!this.isModified('password')) return next();
+    
+    try {
+        console.log('🔐 Hashing password for user:', this.email);
+        const salt = await bcrypt.genSalt(12);
+        this.password = await bcrypt.hash(this.password, salt);
+        console.log('✅ Password hashed successfully');
+        next();
+    } catch (error) {
+        console.error('❌ Password hashing failed:', error);
+        next(error);
+    }
 });
 
-// Compare password method
+// FIXED Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+    try {
+        // Check if password exists
+        if (!this.password) {
+            console.error('❌ No password found for comparison');
+            throw new Error('Password not found for user');
+        }
+        
+        if (!candidatePassword) {
+            console.error('❌ No candidate password provided');
+            throw new Error('No password provided for comparison');
+        }
+
+        console.log('🔍 Comparing passwords for user:', this.email);
+        const isMatch = await bcrypt.compare(candidatePassword.toString(), this.password);
+        console.log('🔍 Password comparison result:', isMatch);
+        
+        return isMatch;
+    } catch (error) {
+        console.error('❌ Password comparison error:', error.message);
+        // Don't throw here, return false instead
+        return false;
+    }
 };
 
-// Remove password from JSON output
+// Hide sensitive fields when converting to JSON
 userSchema.methods.toJSON = function() {
-  const userObject = this.toObject();
-  delete userObject.password;
-  delete userObject.refreshTokens;
-  return userObject;
+    const userObject = this.toObject();
+    delete userObject.password;
+    delete userObject.token;
+    delete userObject.refreshToken;
+    return userObject;
 };
+
+// Update the updatedAt field before saving
+userSchema.pre('save', function(next) {
+    this.updatedAt = Date.now();
+    next();
+});
 
 module.exports = mongoose.model('User', userSchema);
