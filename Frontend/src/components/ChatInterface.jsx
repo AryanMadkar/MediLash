@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Loader2 } from 'lucide-react';
+import { Send, Loader2, Sparkles, MessageCircle } from 'lucide-react';
 import VoiceInput from './VoiceInput';
 import MessageBubble from './MessageBubble';
 import { useMedicalChat } from '../hooks/useMedicalChat';
@@ -7,9 +7,11 @@ import { useMedicalChat } from '../hooks/useMedicalChat';
 const ChatInterface = ({ selectedLanguage, translate, translationLoading }) => {
   const [input, setInput] = useState('');
   const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const [isUserScrolling, setIsUserScrolling] = useState(false);
   const textareaRef = useRef(null);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const scrollTimeoutRef = useRef(null);
 
   const {
     messages,
@@ -22,58 +24,68 @@ const ChatInterface = ({ selectedLanguage, translate, translationLoading }) => {
     endConsultation
   } = useMedicalChat(selectedLanguage, translate);
 
-  /* ----------------- helpers ----------------- */
-  const scrollToBottom = () => {
-    if (shouldAutoScroll && messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+  // Enhanced scroll management
+  const scrollToBottom = (force = false) => {
+    if ((shouldAutoScroll && !isUserScrolling) || force) {
+      messagesEndRef.current?.scrollIntoView({ 
+        behavior: 'smooth',
+        block: 'end'
+      });
     }
   };
 
-  // Only auto-scroll when new messages are added AND user hasn't manually scrolled up
-  useEffect(() => {
-    const checkScrollPosition = () => {
-      if (messagesContainerRef.current) {
-        const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
-        const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-        setShouldAutoScroll(isNearBottom);
-      }
-    };
-
-    // Check scroll position before auto-scrolling
-    checkScrollPosition();
-    
-    // Only scroll if user is near bottom
-    if (messages.length > 0) {
-      setTimeout(scrollToBottom, 100);
-    }
-  }, [messages.length]); // Only trigger on message count change, not content change
-
-  // Handle manual scrolling
+  // Detect user scrolling
   const handleScroll = () => {
     if (messagesContainerRef.current) {
       const { scrollTop, scrollHeight, clientHeight } = messagesContainerRef.current;
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 150;
+      
+      setIsUserScrolling(true);
       setShouldAutoScroll(isNearBottom);
+      
+      // Clear existing timeout
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+      
+      // Reset user scrolling flag after 1 second of no scrolling
+      scrollTimeoutRef.current = setTimeout(() => {
+        setIsUserScrolling(false);
+      }, 1000);
     }
   };
 
-  // Auto-resize textarea without scrolling
+  // Only auto-scroll for new messages, not on submit
+  useEffect(() => {
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      // Only auto-scroll for doctor responses, not user messages
+      if (lastMessage.sender === 'doctor') {
+        setTimeout(() => scrollToBottom(), 300);
+      }
+    }
+  }, [messages.length, shouldAutoScroll]);
+
+  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   }, [input]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    e.stopPropagation(); // Prevent event bubbling
+    e.stopPropagation();
     
     if (!input.trim() || isLoading) return;
 
     const msg = input.trim();
     setInput('');
-    setShouldAutoScroll(true); // Allow auto-scroll for new messages
+    
+    // Prevent auto-scroll on user message submission
+    setIsUserScrolling(true);
+    setShouldAutoScroll(false);
 
     try {
       if (!sessionId) {
@@ -81,15 +93,23 @@ const ChatInterface = ({ selectedLanguage, translate, translationLoading }) => {
       } else {
         await sendMessage(msg);
       }
+      
+      // Re-enable auto-scroll for doctor response
+      setTimeout(() => {
+        setIsUserScrolling(false);
+        setShouldAutoScroll(true);
+      }, 500);
+      
     } catch (error) {
       console.error('Submit error:', error);
+      setIsUserScrolling(false);
+      setShouldAutoScroll(true);
     }
   };
 
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      e.stopPropagation();
       handleSubmit(e);
     }
   };
@@ -97,7 +117,6 @@ const ChatInterface = ({ selectedLanguage, translate, translationLoading }) => {
   const handleEndConsultation = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    
     try {
       await endConsultation();
     } catch (error) {
@@ -105,127 +124,127 @@ const ChatInterface = ({ selectedLanguage, translate, translationLoading }) => {
     }
   };
 
-  /* ----------------- UI ----------------- */
   return (
-    <div className="flex flex-col h-[70vh] max-h-[800px] relative">
-      {/* header */}
-      <div className="flex-none p-4 border-b border-gray-700 bg-gray-800/30 rounded-t-2xl">
+    <div className="flex flex-col h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl shadow-2xl border border-slate-700/50 backdrop-blur-xl">
+      {/* Enhanced Header */}
+      <div className="flex-none bg-gradient-to-r from-blue-600/20 to-purple-600/20 backdrop-blur-xl border-b border-slate-700/50 p-4 rounded-t-2xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+            <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl shadow-lg">
+              <MessageCircle className="h-6 w-6 text-white" />
+            </div>
             <div>
-              <h3 className="font-semibold text-white">
-                {translate('Medical Consultation', selectedLanguage)}
-              </h3>
+              <h2 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                {translate('Medical AI Assistant', selectedLanguage)}
+              </h2>
               {consultationStage && (
-                <p className="text-xs text-gray-400">
-                  {translate(`Stage: ${consultationStage}`, selectedLanguage)}
+                <p className="text-sm text-slate-400">
+                  {translate(`Stage: ${consultationStage}`, selectedLanguage)} • 
+                  <span className="ml-1 text-blue-400">{questionCount}/5 questions</span>
                 </p>
               )}
             </div>
           </div>
-
+          
           {sessionId && (
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-400 bg-gray-700/50 px-3 py-1 rounded-full">
-                {translate(`Questions: ${questionCount}/5`, selectedLanguage)}
-              </span>
-
-              <button
-                type="button"
-                onClick={handleEndConsultation}
-                className="text-red-400 hover:text-red-300 text-sm px-3 py-1 rounded-full border border-red-400/30 hover:bg-red-400/10 transition-colors"
-              >
-                {translate('End Consultation', selectedLanguage)}
-              </button>
-            </div>
+            <button
+              onClick={handleEndConsultation}
+              className="px-4 py-2 bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl"
+            >
+              {translate('End Consultation', selectedLanguage)}
+            </button>
           )}
         </div>
       </div>
 
-      {/* messages */}
+      {/* Enhanced Messages Container */}
       <div 
         ref={messagesContainerRef}
         onScroll={handleScroll}
-        className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-900/20 scroll-smooth"
+        className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar"
+        style={{ scrollBehavior: 'smooth' }}
       >
         {messages.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">🩺</div>
-            <p className="text-gray-400 text-lg mb-2">
-              {translate('Welcome to Medical AI Assistant', selectedLanguage)}
-            </p>
-            <p className="text-gray-500">
-              {translate('Describe your symptoms to start a consultation', selectedLanguage)}
-            </p>
-          </div>
-        ) : (
-          messages.map((msg, i) => (
-            <MessageBubble
-              key={`msg-${i}-${msg.timestamp}`}
-              message={msg}
-              selectedLanguage={selectedLanguage}
-              translate={translate}
-            />
-          ))
-        )}
-
-        {isLoading && (
-          <div className="flex items-center space-x-3 p-4 bg-gray-800/30 rounded-xl border border-gray-700">
-            <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
-              <Loader2 className="h-4 w-4 animate-spin text-white" />
-            </div>
-            <div>
-              <p className="text-white font-medium">AI Doctor</p>
-              <p className="text-gray-400 text-sm">
-                {translate('Doctor is typing...', selectedLanguage)}
+          <div className="flex flex-col items-center justify-center h-full text-center space-y-6">
+            <div className="p-6 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-3xl border border-slate-700/30">
+              <Sparkles className="h-16 w-16 text-blue-400 mx-auto mb-4 animate-pulse" />
+              <h3 className="text-2xl font-bold text-white mb-3">
+                {translate('Welcome to Medical AI Assistant', selectedLanguage)}
+              </h3>
+              <p className="text-slate-300 text-lg max-w-md">
+                {translate('Describe your symptoms to start a consultation', selectedLanguage)}
               </p>
             </div>
           </div>
+        ) : (
+          <>
+            {messages.map((message, index) => (
+              <MessageBubble
+                key={index}
+                message={message}
+                selectedLanguage={selectedLanguage}
+                translate={translate}
+              />
+            ))}
+            {isLoading && (
+              <div className="flex items-center space-x-3 p-4">
+                <div className="p-2 bg-gradient-to-r from-green-500 to-blue-500 rounded-full">
+                  <MessageCircle className="h-5 w-5 text-white" />
+                </div>
+                <div className="bg-gradient-to-r from-slate-800 to-slate-700 rounded-2xl p-4 shadow-xl border border-slate-600/50">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                    <span className="text-slate-300 text-sm">
+                      {translate('Doctor is typing...', selectedLanguage)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
-
         <div ref={messagesEndRef} />
       </div>
 
-      {/* input */}
-      <div className="flex-none p-4 border-t border-gray-700 bg-gray-800/30 rounded-b-2xl">
+      {/* Enhanced Input Area */}
+      <div className="flex-none p-4 bg-gradient-to-r from-slate-800/50 to-slate-700/50 backdrop-blur-xl border-t border-slate-700/50 rounded-b-2xl">
         <form onSubmit={handleSubmit} className="flex items-end space-x-3">
           <div className="flex-1 relative">
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyPress}
+              onKeyPress={handleKeyPress}
               placeholder={translate('Describe your symptoms...', selectedLanguage)}
-              className="w-full bg-gray-700/50 border border-gray-600 rounded-xl px-4 py-3 pr-12 text-white placeholder-gray-400 resize-none min-h-[50px] max-h-32 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              disabled={isLoading}
+              className="w-full p-4 bg-gradient-to-r from-slate-800 to-slate-700 border border-slate-600/50 rounded-2xl text-white placeholder-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 transition-all duration-300 min-h-[60px] max-h-[120px] backdrop-blur-xl shadow-xl"
               rows={1}
+              disabled={isLoading}
             />
-
-            {/* voice input */}
-            <div className="absolute right-2 bottom-2">
+            <div className="absolute bottom-2 right-2">
               <VoiceInput
-                onTranscript={(t) => setInput(t)}
+                onTranscript={(transcript) => {
+                  setInput(prev => prev + (prev ? ' ' : '') + transcript);
+                }}
                 selectedLanguage={selectedLanguage}
                 translate={translate}
               />
             </div>
           </div>
-
+          
           <button
             type="submit"
             disabled={!input.trim() || isLoading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 font-medium transition-colors flex items-center space-x-2"
-            onSubmit={(e) => e.preventDefault()}
+            className="p-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:from-slate-600 disabled:to-slate-500 text-white rounded-2xl transition-all duration-300 transform hover:scale-105 disabled:scale-100 shadow-xl hover:shadow-2xl group disabled:cursor-not-allowed"
           >
             {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-6 w-6 animate-spin" />
             ) : (
-              <Send className="h-5 w-5" />
+              <Send className="h-6 w-6 group-hover:translate-x-0.5 transition-transform" />
             )}
-            <span className="hidden sm:inline">
-              {translate('Send', selectedLanguage)}
-            </span>
           </button>
         </form>
       </div>
