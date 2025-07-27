@@ -1,0 +1,86 @@
+{
+  "navbar": {
+    "search": "शोधा...",
+    "settings": "सेटिंग्ज",
+    "logout": "लॉग आउट"
+  },
+  "sidebar": {
+    "navigation": "नेव्हिगेशन",
+    "dashboard": "डॅशबोर्ड",
+    "chat": "चॅट",
+    "history": "इतिहास",
+    "profile": "प्रोफाइल",
+    "settings": "सेटिंग्ज",
+    "specialties": "विशेषता",
+    "todayStats": "आजचे आकडे",
+    "consultations": "सल्लामसलत",
+    "messages": "संदेश"
+  },
+  "landing": {
+    "title": "तुमचा AI वैद्यकीय सहाय्यक",
+    "subtitle": "तुमच्या पसंतीच्या भाषेत तत्काळ वैद्यकीय सल्ला आणि सल्लामसलत मिळवा",
+    "getStarted": "सुरुवात करा",
+    "learnMore": "अधिक जाणा",
+    "features": {
+      "multilingual": "बहुभाषिक समर्थन",
+      "multilingualDesc": "इंग्रजी, हिंदी किंवा मराठीत संवाद साधा",
+      "voice": "आवाज परस्परसंवाद",
+      "voiceDesc": "नैसर्गिकरित्या बोला आणि ऑडिओ प्रतिसाद मिळवा",
+      "ai": "AI-चालित",
+      "aiDesc": "अचूक अंतर्दृष्टीसाठी प्रगत वैद्यकीय AI"
+    }
+  },
+  "auth": {
+    "login": "लॉग इन",
+    "register": "नोंदणी",
+    "email": "ईमेल",
+    "password": "पासवर्ड",
+    "confirmPassword": "पासवर्डची पुष्टी करा",
+    "name": "पूर्ण नाव",
+    "phone": "फोन नंबर",
+    "forgotPassword": "पासवर्ड विसरलात?",
+    "loginTitle": "पुन्हा स्वागत आहे",
+    "loginSubtitle": "तुमच्या खात्यात साइन इन करा",
+    "registerTitle": "खाते तयार करा",
+    "registerSubtitle": "आज MediChain मध्ये सामील व्हा",
+    "alreadyHaveAccount": "आधीच खाते आहे?",
+    "dontHaveAccount": "खाते नाही?"
+  },
+  "dashboard": {
+    "welcome": "परत येण्यावर स्वागत",
+    "quickActions": "द्रुत कृती",
+    "startChat": "नवीन चॅट सुरू करा",
+    "viewHistory": "इतिहास पहा",
+    "updateProfile": "प्रोफाइल अपडेट करा",
+    "recentActivity": "अलीकडील गतिविधी",
+    "stats": {
+      "totalChats": "एकूण चॅट",
+      "thisMonth": "या महिन्यात",
+      "avgResponse": "सरासरी प्रतिसाद वेळ",
+      "satisfaction": "समाधान दर"
+    }
+  },
+  "chat": {
+    "title": "वैद्यकीय चॅट",
+    "placeholder": "तुमच्या लक्षणांचे वर्णन करा किंवा वैद्यकीय प्रश्न विचारा...",
+    "send": "पाठवा",
+    "listening": "ऐकत आहे...",
+    "speaking": "बोलत आहे...",
+    "startVoice": "आवाज इनपुट सुरू करा",
+    "stopVoice": "आवाज इनपुट थांबवा",
+    "newChat": "नवीन चॅट",
+    "clearChat": "चॅट साफ करा"
+  },
+  "common": {
+    "loading": "लोड होत आहे...",
+    "error": "त्रुटी",
+    "success": "यश",
+    "cancel": "रद्द करा",
+    "save": "सेव्ह करा",
+    "edit": "संपादित करा",
+    "delete": "हटवा",
+    "close": "बंद करा",
+    "yes": "होय",
+    "no": "नाही"
+  }
+}
