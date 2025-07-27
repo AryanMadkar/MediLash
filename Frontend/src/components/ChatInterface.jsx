@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { Send, Loader2 } from 'lucide-react'
 import VoiceInput from './VoiceInput'
 import MessageBubble from './MessageBubble'
+import SpecialistConnection from './SpecialistConnection'
 import { useMedicalChat } from '../hooks/useMedicalChat'
 
 const ChatInterface = ({ selectedLanguage, translate, translationLoading }) => {
@@ -14,9 +15,13 @@ const ChatInterface = ({ selectedLanguage, translate, translationLoading }) => {
     isLoading,
     sessionId,
     consultationStage,
+    questionCount,
+    showSpecialistOption,
     sendMessage,
     startNewConsultation,
-    endConsultation
+    endConsultation,
+    connectToSpecialist,
+    setShowSpecialistOption
   } = useMedicalChat(selectedLanguage, translate)
 
   const scrollToBottom = () => {
@@ -51,6 +56,10 @@ const ChatInterface = ({ selectedLanguage, translate, translationLoading }) => {
     }
   }
 
+  const handleSpecialistConnect = (specialistData) => {
+    connectToSpecialist(specialistData)
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="bg-white rounded-lg shadow-xl overflow-hidden">
@@ -61,11 +70,18 @@ const ChatInterface = ({ selectedLanguage, translate, translationLoading }) => {
               <h2 className="text-xl font-semibold">
                 {translate('Medical Consultation', selectedLanguage)}
               </h2>
-              {consultationStage && (
-                <p className="text-blue-100 text-sm">
-                  {translate(`Stage: ${consultationStage}`, selectedLanguage)}
-                </p>
-              )}
+              <div className="flex items-center gap-4 mt-1">
+                {consultationStage && (
+                  <p className="text-blue-100 text-sm">
+                    {translate(`Stage: ${consultationStage}`, selectedLanguage)}
+                  </p>
+                )}
+                {sessionId && (
+                  <p className="text-blue-100 text-sm">
+                    {translate(`Questions: ${questionCount}/5`, selectedLanguage)}
+                  </p>
+                )}
+              </div>
             </div>
             {sessionId && (
               <button
@@ -77,6 +93,28 @@ const ChatInterface = ({ selectedLanguage, translate, translationLoading }) => {
             )}
           </div>
         </div>
+
+        {/* Specialist Connection Banner */}
+        {showSpecialistOption && (
+          <div className="bg-purple-50 border-b border-purple-200 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-purple-800">
+                  {translate('Ready for Expert Consultation?', selectedLanguage)}
+                </h3>
+                <p className="text-sm text-purple-600">
+                  {translate('Connect with a specialist for detailed evaluation', selectedLanguage)}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSpecialistOption(true)}
+                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm font-medium transition-colors"
+              >
+                {translate('Connect Now', selectedLanguage)}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Messages Area */}
         <div className="h-96 overflow-y-auto p-4 space-y-4 bg-gray-50">
@@ -146,6 +184,15 @@ const ChatInterface = ({ selectedLanguage, translate, translationLoading }) => {
           </form>
         </div>
       </div>
+
+      {/* Specialist Connection Modal */}
+      <SpecialistConnection
+        isVisible={showSpecialistOption}
+        onClose={() => setShowSpecialistOption(false)}
+        onConnect={handleSpecialistConnect}
+        selectedLanguage={selectedLanguage}
+        translate={translate}
+      />
     </div>
   )
 }
