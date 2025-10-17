@@ -13,7 +13,7 @@ class GroqClient:
 
         self.llm = ChatGroq(
             groq_api_key=self.api_key,
-            model_name="groq/compound",
+            model_name="openai/gpt-oss-120b",
             temperature=0.3,
             max_tokens=1000,
         )
