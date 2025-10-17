@@ -13,7 +13,7 @@ class GroqClient:
 
         self.llm = ChatGroq(
             groq_api_key=self.api_key,
-            model_name="llama3-70b-8192",
+            model_name="groq/compound",
             temperature=0.3,
             max_tokens=1000,
         )
